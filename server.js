@@ -6,6 +6,11 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ==================== BIẾN MÔI TRƯỜNG ====================
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || null;
+
+console.log('🔐 WEBHOOK_SECRET:', WEBHOOK_SECRET ? '✅ Đã cấu hình' : '⚠️ Chưa cấu hình (chế độ không xác thực)');
+
 // ==================== MIDDLEWARE ====================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -34,33 +39,30 @@ db.run(`
   )
 `);
 
-// ==================== WEBHOOK ENDPOINT (có xác thực HMAC) ====================
+// ==================== WEBHOOK ENDPOINT ====================
 app.post('/webhook', async (req, res) => {
   console.log('📩 Nhận webhook từ SePay');
 
   try {
     const data = req.body;
     const signature = req.headers['x-sepay-signature'];
-    const secret = process.env.WEBHOOK_SECRET;
 
     // ========== XÁC THỰC HMAC-SHA256 ==========
-    if (secret) {
-      // Nếu có secret nhưng không có signature → từ chối
+    if (WEBHOOK_SECRET) {
       if (!signature) {
+        console.warn('⚠️ Thiếu signature header');
         return res.status(401).json({
           success: false,
           message: 'Missing signature header'
         });
       }
 
-      // Tính chữ ký từ payload
       const payloadString = JSON.stringify(data);
       const computedSignature = crypto
-        .createHmac('sha256', secret)
+        .createHmac('sha256', WEBHOOK_SECRET)
         .update(payloadString)
         .digest('hex');
 
-      // So sánh chữ ký (dùng timing-safe comparison)
       const isValid = crypto.timingSafeEqual(
         Buffer.from(signature, 'hex'),
         Buffer.from(computedSignature, 'hex')
@@ -75,10 +77,12 @@ app.post('/webhook', async (req, res) => {
       }
 
       console.log('✅ Chữ ký hợp lệ');
+    } else {
+      console.log('ℹ️ Chế độ không xác thực (WEBHOOK_SECRET chưa cấu hình)');
     }
 
     // ========== XỬ LÝ DỮ LIỆU ==========
-    console.log('📋 Dữ liệu:', JSON.stringify(data, null, 2));
+    console.log('📋 Dữ liệu nhận được:', JSON.stringify(data, null, 2));
 
     const tx = {
       transaction_id: data.transaction_id || data.id || `TX${Date.now()}`,
@@ -114,6 +118,8 @@ app.post('/webhook', async (req, res) => {
     );
     stmt.finalize();
 
+    console.log('✅ Đã lưu giao dịch:', tx.transaction_id);
+
     res.status(200).json({
       success: true,
       message: 'Webhook received',
@@ -121,7 +127,7 @@ app.post('/webhook', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Lỗi:', error);
+    console.error('❌ Lỗi xử lý webhook:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -160,6 +166,21 @@ app.get('/api/transactions', (req, res) => {
   });
 });
 
+// ==================== API LẤY SỐ DƯ MỚI NHẤT ====================
+app.get('/api/balance', (req, res) => {
+  db.get('SELECT balance, received_at FROM transactions ORDER BY received_at DESC LIMIT 1', (err, row) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+
+    res.json({
+      success: true,
+      balance: row ? row.balance : 0,
+      updated_at: row ? row.received_at : null
+    });
+  });
+});
+
 // ==================== TRANG CHỦ ====================
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -167,7 +188,8 @@ app.get('/', (req, res) => {
 
 // ==================== KHỞI ĐỘNG SERVER ====================
 app.listen(PORT, () => {
-  console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);
+  console.log(`\n🚀 Server đang chạy tại: http://localhost:${PORT}`);
   console.log(`🔗 Webhook URL: http://localhost:${PORT}/webhook`);
-  console.log(`🔐 WEBHOOK_SECRET: ${process.env.WEBHOOK_SECRET ? '✅ Đã cấu hình' : '❌ Chưa cấu hình (không xác thực)'}`);
+  console.log(`📊 Dashboard: http://localhost:${PORT}`);
+  console.log(`🔐 Bảo mật: ${WEBHOOK_SECRET ? '✅ HMAC-SHA256 đã bật' : '⚠️ Không xác thực'}\n`);
 });
