@@ -1,7 +1,7 @@
 {
   "name": "sepay-webhook",
   "version": "1.0.0",
-  "description": "Webhook receiver for SePay",
+  "description": "Webhook receiver for SePay with HMAC-SHA256",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
