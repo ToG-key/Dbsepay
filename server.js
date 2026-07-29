@@ -40,12 +40,37 @@ db.run(`
 `);
 
 // ==================== WEBHOOK ENDPOINT ====================
+
+// GET: Kiểm tra webhook đang hoạt động
+app.get('/webhook', (req, res) => {
+  res.json({
+    success: true,
+    message: '✅ Webhook endpoint is active',
+    method: 'GET - Dùng để test, chỉ POST mới xử lý giao dịch',
+    timestamp: new Date().toISOString(),
+    instructions: 'Gửi POST request đến /webhook với dữ liệu JSON',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-SePay-Signature': 'HMAC-SHA256 signature (nếu có)'
+    },
+    sample_post: {
+      transaction_id: 'TX_EXAMPLE_001',
+      amount: 100000,
+      description: 'Chuyển tiền từ MB Bank',
+      account_number: '0123456789'
+    }
+  });
+});
+
+// POST: Nhận webhook thực tế
 app.post('/webhook', async (req, res) => {
   console.log('📩 Nhận webhook từ SePay');
 
   try {
     const data = req.body;
     const signature = req.headers['x-sepay-signature'];
+
+    console.log('📋 Dữ liệu nhận được:', JSON.stringify(data, null, 2));
 
     // ========== XÁC THỰC HMAC-SHA256 ==========
     if (WEBHOOK_SECRET) {
@@ -82,8 +107,6 @@ app.post('/webhook', async (req, res) => {
     }
 
     // ========== XỬ LÝ DỮ LIỆU ==========
-    console.log('📋 Dữ liệu nhận được:', JSON.stringify(data, null, 2));
-
     const tx = {
       transaction_id: data.transaction_id || data.id || `TX${Date.now()}`,
       account_number: data.account_number || data.accountNo || data.bank_account || '',
