@@ -11,7 +11,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ==================== DATABASE ====================
-// Dùng SQLite trong thư mục /tmp (Vercel hỗ trợ ghi tạm)
 const DB_PATH = process.env.VERCEL ? '/tmp/transactions.sqlite' : './transactions.sqlite';
 const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) console.error('❌ Lỗi DB:', err.message);
@@ -35,28 +34,52 @@ db.run(`
   )
 `);
 
-// ==================== WEBHOOK ENDPOINT ====================
+// ==================== WEBHOOK ENDPOINT (có xác thực HMAC) ====================
 app.post('/webhook', async (req, res) => {
   console.log('📩 Nhận webhook từ SePay');
-  console.log('📋 Dữ liệu:', JSON.stringify(req.body, null, 2));
 
   try {
     const data = req.body;
-
-    // Xác thực signature (nếu có)
     const signature = req.headers['x-sepay-signature'];
     const secret = process.env.WEBHOOK_SECRET;
-    if (secret && signature) {
-      const computed = crypto
-        .createHmac('sha256', secret)
-        .update(JSON.stringify(data))
-        .digest('hex');
-      if (computed !== signature) {
-        return res.status(401).json({ success: false, message: 'Invalid signature' });
+
+    // ========== XÁC THỰC HMAC-SHA256 ==========
+    if (secret) {
+      // Nếu có secret nhưng không có signature → từ chối
+      if (!signature) {
+        return res.status(401).json({
+          success: false,
+          message: 'Missing signature header'
+        });
       }
+
+      // Tính chữ ký từ payload
+      const payloadString = JSON.stringify(data);
+      const computedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(payloadString)
+        .digest('hex');
+
+      // So sánh chữ ký (dùng timing-safe comparison)
+      const isValid = crypto.timingSafeEqual(
+        Buffer.from(signature, 'hex'),
+        Buffer.from(computedSignature, 'hex')
+      );
+
+      if (!isValid) {
+        console.warn('⚠️ Chữ ký không hợp lệ!');
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid signature'
+        });
+      }
+
+      console.log('✅ Chữ ký hợp lệ');
     }
 
-    // Parse dữ liệu
+    // ========== XỬ LÝ DỮ LIỆU ==========
+    console.log('📋 Dữ liệu:', JSON.stringify(data, null, 2));
+
     const tx = {
       transaction_id: data.transaction_id || data.id || `TX${Date.now()}`,
       account_number: data.account_number || data.accountNo || data.bank_account || '',
@@ -146,4 +169,5 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);
   console.log(`🔗 Webhook URL: http://localhost:${PORT}/webhook`);
+  console.log(`🔐 WEBHOOK_SECRET: ${process.env.WEBHOOK_SECRET ? '✅ Đã cấu hình' : '❌ Chưa cấu hình (không xác thực)'}`);
 });
