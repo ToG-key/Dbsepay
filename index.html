@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>💳 SePay Webhook</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0e1a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 0;
+      border-bottom: 1px solid #1a2236;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #f59e0b, #f97316);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .header .status .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .webhook-box {
+      background: #0f172a;
+      border: 1px solid #1f2937;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .webhook-box code {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      color: #f59e0b;
+      word-break: break-all;
+      flex: 1;
+    }
+    .webhook-box .badge {
+      background: #22c55e20;
+      color: #22c55e;
+      padding: 2px 12px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .webhook-box button {
+      padding: 4px 14px;
+      background: #1f2937;
+      border: none;
+      border-radius: 6px;
+      color: #e2e8f0;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .webhook-box button:hover { background: #374151; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 10px;
+      padding: 14px 18px;
+    }
+    .stat-card .label {
+      font-size: 11px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .stat-card .value {
+      font-size: 20px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+    .stat-card .value.in { color: #22c55e; }
+    .stat-card .value.out { color: #ef4444; }
+    .stat-card .value.total { color: #f59e0b; }
+    .filters {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .filters button {
+      padding: 5px 14px;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .filters button:hover { background: #1f2937; }
+    .filters button.active {
+      background: #f59e0b;
+      color: #0a0e1a;
+      border-color: #f59e0b;
+    }
+    .table-wrap {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 10px;
+      overflow: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      background: #0f172a;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 500;
+      color: #6b7280;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #1f2937;
+      position: sticky;
+      top: 0;
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #1a2236;
+      color: #e2e8f0;
+    }
+    tr:hover td { background: #1a2236; }
+    .amount-in { color: #22c55e; }
+    .amount-out { color: #ef4444; }
+    .tx-type {
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .tx-type.in { background: #22c55e20; color: #22c55e; }
+    .tx-type.out { background: #ef444420; color: #ef4444; }
+    .empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: #6b7280;
+    }
+    .refresh-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #6b7280;
+    }
+    @media (max-width: 640px) {
+      .stats { grid-template-columns: 1fr 1fr; }
+      table { font-size: 12px; }
+      th, td { padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>💳 SePay Webhook</h1>
+    <div class="status">
+      <span class="dot"></span>
+      <span id="statusText">Đang kết nối...</span>
+      <span style="color:#475569;margin-left:8px;" id="lastUpdate"></span>
+    </div>
+  </div>
+
+  <div class="webhook-box">
+    <span style="color:#6b7280;font-size:13px;">🔗 Webhook URL:</span>
+    <code id="webhookUrl">https://your-domain.vercel.app/webhook</code>
+    <span class="badge">JSON</span>
+    <button onclick="copyWebhookUrl()">📋 Sao chép</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Tổng giao dịch</div>
+      <div class="value total" id="totalTx">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Tiền vào</div>
+      <div class="value in" id="totalIn">0đ</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Tiền ra</div>
+      <div class="value out" id="totalOut">0đ</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Số dư gần nhất</div>
+      <div class="value total" id="latestBalance">0đ</div>
+    </div>
+  </div>
+
+  <div class="filters">
+    <button class="active" data-filter="all">📊 Tất cả</button>
+    <button data-filter="in">⬇️ Tiền vào</button>
+    <button data-filter="out">⬆️ Tiền ra</button>
+  </div>
+
+  <div class="refresh-bar">
+    <span>Tự động làm mới <span id="countdown">5</span>s</span>
+    <button onclick="fetchData()" style="background:transparent;border:1px solid #1f2937;border-radius:6px;padding:2px 12px;color:#94a3b8;cursor:pointer;">⟳ Làm mới</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Thời gian</th>
+          <th>Mô tả</th>
+          <th>Số tiền</th>
+          <th>Số dư</th>
+          <th>Loại</th>
+          <th>Mã tham chiếu</th>
+        </tr>
+      </thead>
+      <tbody id="transactionList">
+        <tr><td colspan="6" class="empty">⏳ Đang tải...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  let currentFilter = 'all';
+  let countdown = 5;
+
+  function formatMoney(amount) {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(amount);
+  }
+
+  function formatTime(dateStr) {
+    try { return new Date(dateStr).toLocaleString('vi-VN', { hour12: false }); }
+    catch { return dateStr; }
+  }
+
+  function getWebhookUrl() {
+    return window.location.origin + '/webhook';
+  }
+
+  function copyWebhookUrl() {
+    const url = getWebhookUrl();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => showToast('✅ Đã sao chép'));
+    } else {
+      const input = document.createElement('input');
+      input.value = url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      input.remove();
+      showToast('✅ Đã sao chép');
+    }
+  }
+
+  function showToast(msg) {
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a2236;border:1px solid #f59e0b;color:#e2e8f0;padding:10px 24px;border-radius:8px;font-size:14px;z-index:9999;';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 2000);
+  }
+
+  async function fetchData() {
+    try {
+      const url = '/api/transactions?limit=100' + (currentFilter !== 'all' ? '&type=' + currentFilter : '');
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.success) {
+        document.getElementById('statusText').textContent = '✅ Đã kết nối';
+        document.getElementById('lastUpdate').textContent = 'Cập nhật: ' + new Date().toLocaleTimeString('vi-VN');
+        document.querySelector('.dot').style.background = '#22c55e';
+
+        document.getElementById('totalTx').textContent = data.total || 0;
+        document.getElementById('totalIn').textContent = formatMoney(data.total_in || 0);
+        document.getElementById('totalOut').textContent = formatMoney(data.total_out || 0);
+        document.getElementById('latestBalance').textContent = formatMoney(data.latest_balance || 0);
+
+        const rows = data.data || [];
+        const tbody = document.getElementById('transactionList');
+
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty">📭 Chưa có giao dịch nào</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = rows.map(t => {
+          const isIn = t.amount > 0;
+          const amount = Math.abs(t.amount || 0);
+          return '<tr>' +
+            '<td style="font-size:12px;color:#94a3b8;">' + formatTime(t.transaction_at || t.received_at) + '</td>' +
+            '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + (t.description || '') + '">' + (t.description || '—') + '</td>' +
+            '<td class="' + (isIn ? 'amount-in' : 'amount-out') + '">' + (isIn ? '+' : '-') + formatMoney(amount) + '</td>' +
+            '<td>' + (t.balance ? formatMoney(t.balance) : '—') + '</td>' +
+            '<td><span class="tx-type ' + (isIn ? 'in' : 'out') + '">' + (isIn ? '⬇️ Vào' : '⬆️ Ra') + '</span></td>' +
+            '<td style="font-size:12px;color:#6b7280;font-family:monospace;">' + (t.reference_code || t.transaction_id?.slice(-8) || '—') + '</td>' +
+            '</tr>';
+        }).join('');
+      }
+    } catch (error) {
+      document.getElementById('statusText').textContent = '🔴 Mất kết nối';
+      document.querySelector('.dot').style.background = '#ef4444';
+    }
+  }
+
+  // ==================== POLLING ====================
+  let pollInterval;
+
+  function startPolling() {
+    fetchData();
+    pollInterval = setInterval(() => {
+      countdown--;
+      document.getElementById('countdown').textContent = countdown;
+      if (countdown <= 0) {
+        countdown = 5;
+        fetchData();
+      }
+    }, 1000);
+  }
+
+  // ==================== FILTERS ====================
+  document.querySelectorAll('.filters button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      fetchData();
+    });
+  });
+
+  // ==================== WEBHOOK URL ====================
+  document.getElementById('webhookUrl').textContent = getWebhookUrl();
+
+  // ==================== BOOT ====================
+  startPolling();
+
+  console.log('🚀 SePay Webhook Dashboard ready');
+  console.log('🔗 Webhook URL:', getWebhookUrl());
+</script>
+
+</body>
+</html>
