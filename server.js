@@ -20,7 +20,6 @@ const DATA_FILE = path.join(__dirname, 'key.json');
 
 // ===== HÀM ĐỌC/GHI DỮ LIỆU =====
 
-// Đọc dữ liệu từ file
 function readKeys() {
     try {
         if (fs.existsSync(DATA_FILE)) {
@@ -28,21 +27,56 @@ function readKeys() {
             return JSON.parse(data);
         }
     } catch (error) {
-        console.error('Lỗi đọc file:', error);
+        console.error('Lỗi đọc file:', error.message);
     }
     return [];
 }
 
-// Ghi dữ liệu vào file
 function writeKeys(keys) {
     try {
         fs.writeFileSync(DATA_FILE, JSON.stringify(keys, null, 2));
         return true;
     } catch (error) {
-        console.error('Lỗi ghi file:', error);
+        console.error('Lỗi ghi file:', error.message);
         return false;
     }
 }
+
+// ===== TẠO KEY MẶC ĐỊNH NẾU CHƯA CÓ =====
+
+function initDefaultKeys() {
+    const keys = readKeys();
+    if (keys.length === 0) {
+        const defaultKeys = [
+            {
+                id: 'key_default_1',
+                key: 'HL92-REP0-RTAL-LXXX',
+                status: 'active',
+                type: 'all',
+                createdAt: new Date().toISOString()
+            },
+            {
+                id: 'key_default_2',
+                key: 'HOTL-KEYA-LLXX-XXXX',
+                status: 'active',
+                type: 'all',
+                createdAt: new Date().toISOString()
+            },
+            {
+                id: 'key_default_3',
+                key: 'FULL-ACCE-SSAL-LKEY',
+                status: 'active',
+                type: 'all',
+                createdAt: new Date().toISOString()
+            }
+        ];
+        writeKeys(defaultKeys);
+        console.log('✅ Đã tạo 3 key mặc định');
+    }
+}
+
+// Gọi khởi tạo
+initDefaultKeys();
 
 // ===== API ROUTES =====
 
@@ -106,7 +140,44 @@ app.get('/api/keys/:id', (req, res) => {
     }
 });
 
-// 4. Kiểm tra key tồn tại
+// 4. KIỂM TRA KEY (QUAN TRỌNG - DÙNG CHO EXTENSION)
+app.get('/api/check-key', (req, res) => {
+    try {
+        const { key, machine_id } = req.query;
+        
+        if (!key || key.trim() === '') {
+            return res.status(400).json({
+                valid: false,
+                message: 'Vui lòng nhập key'
+            });
+        }
+
+        const keys = readKeys();
+        const foundKey = keys.find(k => k.key === key.trim() && k.status === 'active');
+        
+        if (foundKey) {
+            // Trả về đúng format extension cần
+            res.json({
+                valid: true,
+                expires: Math.floor(Date.now() / 1000) + 31536000, // 1 năm
+                type: foundKey.type || 'all',
+                message: '✅ Key hợp lệ'
+            });
+        } else {
+            res.json({
+                valid: false,
+                message: '❌ Key không tồn tại hoặc đã bị khóa'
+            });
+        }
+    } catch (error) {
+        res.status(500).json({
+            valid: false,
+            message: 'Lỗi kiểm tra key: ' + error.message
+        });
+    }
+});
+
+// 5. Kiểm tra key tồn tại (POST)
 app.post('/api/check-key', (req, res) => {
     try {
         const { key } = req.body;
@@ -125,10 +196,12 @@ app.post('/api/check-key', (req, res) => {
             res.json({
                 success: true,
                 exists: true,
-                message: '✅ Key tồn tại',
+                valid: foundKey.status === 'active',
+                message: foundKey.status === 'active' ? '✅ Key hợp lệ' : '⚠️ Key đã bị khóa',
                 data: {
                     key: foundKey.key,
                     status: foundKey.status,
+                    type: foundKey.type || 'all',
                     createdAt: foundKey.createdAt
                 }
             });
@@ -136,6 +209,7 @@ app.post('/api/check-key', (req, res) => {
             res.json({
                 success: true,
                 exists: false,
+                valid: false,
                 message: '❌ Key không tồn tại'
             });
         }
@@ -148,10 +222,10 @@ app.post('/api/check-key', (req, res) => {
     }
 });
 
-// 5. Thêm key mới
+// 6. Thêm key mới
 app.post('/api/keys', (req, res) => {
     try {
-        const { key, status = 'active' } = req.body;
+        const { key, status = 'active', type = 'all' } = req.body;
         
         if (!key || key.trim() === '') {
             return res.status(400).json({
@@ -176,6 +250,7 @@ app.post('/api/keys', (req, res) => {
             id: `key_${Date.now()}`,
             key: key.trim(),
             status: status,
+            type: type,
             createdAt: new Date().toISOString()
         };
 
@@ -202,7 +277,46 @@ app.post('/api/keys', (req, res) => {
     }
 });
 
-// 6. Xóa key theo ID
+// 7. Cập nhật key
+app.put('/api/keys/:id', (req, res) => {
+    try {
+        const { status, type } = req.body;
+        const keys = readKeys();
+        const index = keys.findIndex(k => k.id === req.params.id);
+        
+        if (index === -1) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy key'
+            });
+        }
+
+        if (status) keys[index].status = status;
+        if (type) keys[index].type = type;
+        keys[index].updatedAt = new Date().toISOString();
+
+        if (writeKeys(keys)) {
+            res.json({
+                success: true,
+                message: 'Cập nhật key thành công',
+                data: keys[index]
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'Lỗi lưu dữ liệu'
+            });
+        }
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi cập nhật key',
+            error: error.message
+        });
+    }
+});
+
+// 8. Xóa key theo ID
 app.delete('/api/keys/:id', (req, res) => {
     try {
         const keys = readKeys();
@@ -239,7 +353,7 @@ app.delete('/api/keys/:id', (req, res) => {
     }
 });
 
-// 7. Xóa tất cả keys
+// 9. Xóa tất cả keys
 app.delete('/api/keys', (req, res) => {
     try {
         const count = readKeys().length;
@@ -282,8 +396,10 @@ app.listen(PORT, () => {
     console.log(`   GET    /api/health          - Kiểm tra server`);
     console.log(`   GET    /api/keys            - Lấy danh sách keys`);
     console.log(`   GET    /api/keys/:id        - Lấy key theo ID`);
+    console.log(`   GET    /api/check-key       - CHECK KEY (dùng cho extension)`);
     console.log(`   POST   /api/keys            - Thêm key mới`);
     console.log(`   POST   /api/check-key       - Kiểm tra key tồn tại`);
+    console.log(`   PUT    /api/keys/:id        - Cập nhật key`);
     console.log(`   DELETE /api/keys/:id        - Xóa key`);
     console.log(`   DELETE /api/keys            - Xóa tất cả keys`);
     console.log(`\n💡 Mở trình duyệt: http://localhost:${PORT}\n`);
