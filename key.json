@@ -1,19 +1,19 @@
 [
   {
     "id": "key_1",
-    "key": "GODZTTTKKKKZZZZ",
+    "key": "GODZ-TTTT-KKKK-ZZZZ",
     "status": "active",
     "createdAt": "2024-01-15T10:30:00.000Z"
   },
   {
     "id": "key_2",
-    "key": "VIP1234567891234",
+    "key": "VIP1-2345-6789-1234",
     "status": "active",
     "createdAt": "2024-01-15T11:00:00.000Z"
   },
   {
     "id": "key_3",
-    "key": "TTTTGGGGHHHHKKKK",
+    "key": "TTTT-GGGG-HHHH-KKKK",
     "status": "inactive",
     "createdAt": "2024-01-15T11:30:00.000Z"
   }
