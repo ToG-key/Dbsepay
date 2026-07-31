@@ -207,6 +207,11 @@
             background: #ffc107;
         }
 
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 15px;
@@ -287,7 +292,7 @@
                     </thead>
                     <tbody id="keyList">
                         <tr>
-                            <td colspan="5" class="empty">Chưa có key nào</td>
+                            <td colspan="5" class="empty">🔄 Đang tải...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -311,9 +316,13 @@
     </div>
 
     <script>
+        // ===== CẤU HÌNH =====
+        const API_URL = 'https://dbsepay.vercel.app/api';
+
         // ===== DATA =====
         let keys = [];
         let isConnected = false;
+        let isLoading = false;
 
         // DOM elements
         const manualKeyInput = document.getElementById('manualKey');
@@ -362,6 +371,34 @@
             return parts.join('-');
         }
 
+        // Gọi API
+        async function callAPI(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+
+                const response = await fetch(`${API_URL}${endpoint}`, options);
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || 'Có lỗi xảy ra');
+                }
+
+                return result;
+            } catch (error) {
+                console.error('API Error:', error);
+                throw error;
+            }
+        }
+
         // Lưu vào localStorage
         function saveToStorage() {
             try {
@@ -385,9 +422,43 @@
             return false;
         }
 
+        // Tải keys từ server
+        async function loadKeysFromServer() {
+            if (isLoading) return;
+            
+            isLoading = true;
+            keyList.innerHTML = `
+                <tr>
+                    <td colspan="5" class="empty">🔄 Đang tải dữ liệu...</td>
+                </tr>
+            `;
+
+            try {
+                const result = await callAPI('/keys');
+                if (result.success && result.data) {
+                    keys = result.data;
+                    renderKeys();
+                    saveToStorage();
+                    isConnected = true;
+                    statusDot.className = 'dot dot-connected';
+                    statusText.textContent = '✅ Đã kết nối server';
+                }
+            } catch (error) {
+                console.error('Lỗi tải keys:', error);
+                // Dùng dữ liệu local
+                loadFromStorage();
+                renderKeys();
+                isConnected = false;
+                statusDot.className = 'dot dot-disconnected';
+                statusText.textContent = '⚠️ Mất kết nối (dùng local)';
+            } finally {
+                isLoading = false;
+            }
+        }
+
         // Hiển thị danh sách key
         function renderKeys() {
-            if (keys.length === 0) {
+            if (!keys || keys.length === 0) {
                 keyList.innerHTML = `
                     <tr>
                         <td colspan="5" class="empty">📭 Chưa có key nào</td>
@@ -406,7 +477,7 @@
                             ${key.status === 'active' ? '✅ Hoạt động' : '❌ Không hoạt động'}
                         </span>
                     </td>
-                    <td>${key.createdAt || 'N/A'}</td>
+                    <td>${key.createdAt ? new Date(key.createdAt).toLocaleString('vi-VN') : 'N/A'}</td>
                     <td>
                         <button class="danger" onclick="deleteKey('${key.id}')" style="padding: 5px 10px; font-size: 12px;">
                             🗑️
@@ -419,69 +490,124 @@
         }
 
         // Thêm key mới
-        function addKey(keyValue) {
+        async function addKey(keyValue) {
             if (!keyValue || keyValue.trim() === '') {
                 alert('⚠️ Vui lòng nhập key!');
                 return false;
             }
 
             const newKey = {
+                key: keyValue.trim(),
+                status: 'active'
+            };
+
+            try {
+                // Thử gửi lên server
+                if (isConnected) {
+                    const result = await callAPI('/keys', 'POST', newKey);
+                    if (result.success) {
+                        await loadKeysFromServer();
+                        manualKeyInput.value = '';
+                        alert('✅ Thêm key thành công!');
+                        return true;
+                    }
+                }
+            } catch (error) {
+                console.error('Lỗi thêm key lên server:', error);
+                // Fallback: thêm vào local
+            }
+
+            // Thêm vào local nếu không kết nối được server
+            const localKey = {
                 id: 'key_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
                 key: keyValue.trim(),
                 status: 'active',
-                createdAt: new Date().toLocaleString('vi-VN')
+                createdAt: new Date().toISOString()
             };
 
-            keys.unshift(newKey);
+            keys.unshift(localKey);
             renderKeys();
             saveToStorage();
-            
             manualKeyInput.value = '';
+            alert('✅ Thêm key thành công (lưu local)!');
             return true;
         }
 
         // Xóa 1 key
-        function deleteKey(id) {
+        async function deleteKey(id) {
             if (!confirm('Bạn có chắc muốn xóa key này?')) return;
             
+            try {
+                // Thử xóa trên server
+                if (isConnected) {
+                    const result = await callAPI(`/keys/${id}`, 'DELETE');
+                    if (result.success) {
+                        await loadKeysFromServer();
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Lỗi xóa key trên server:', error);
+            }
+
+            // Xóa local
             keys = keys.filter(k => k.id !== id);
             renderKeys();
             saveToStorage();
         }
 
         // Xóa tất cả
-        function deleteAllKeys() {
+        async function deleteAllKeys() {
             if (!confirm('Bạn có chắc muốn xóa TẤT CẢ key?')) return;
             
+            try {
+                // Thử xóa trên server
+                if (isConnected) {
+                    const result = await callAPI('/keys', 'DELETE');
+                    if (result.success) {
+                        await loadKeysFromServer();
+                        alert('✅ Đã xóa tất cả!');
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Lỗi xóa tất cả trên server:', error);
+            }
+
+            // Xóa local
             keys = [];
             renderKeys();
             saveToStorage();
-            alert('✅ Đã xóa tất cả!');
+            alert('✅ Đã xóa tất cả (lưu local)!');
         }
 
-        // Kiểm tra kết nối server (giả lập)
-        function checkConnection() {
+        // Kiểm tra kết nối server
+        async function checkConnection() {
             statusDot.className = 'dot dot-checking';
-            statusText.textContent = 'Đang kiểm tra...';
+            statusText.textContent = '🔄 Đang kiểm tra...';
             checkBtn.disabled = true;
 
-            // Giả lập kiểm tra kết nối
-            setTimeout(() => {
-                // 80% kết nối thành công
-                const connected = Math.random() < 0.8;
-                
-                if (connected) {
+            try {
+                const result = await callAPI('/health');
+                if (result.status === 'ok') {
                     isConnected = true;
                     statusDot.className = 'dot dot-connected';
                     statusText.textContent = '✅ Đã kết nối server';
+                    await loadKeysFromServer();
                 } else {
-                    isConnected = false;
-                    statusDot.className = 'dot dot-disconnected';
-                    statusText.textContent = '❌ Mất kết nối (dùng local)';
+                    throw new Error('Server không phản hồi đúng');
                 }
-                
+            } catch (error) {
+                console.error('Lỗi kết nối:', error);
+                isConnected = false;
+                statusDot.className = 'dot dot-disconnected';
+                statusText.textContent = '❌ Mất kết nối (dùng local)';
+                // Dùng dữ liệu local
+                loadFromStorage();
+                renderKeys();
+            } finally {
                 checkBtn.disabled = false;
-            }, 1000);
+            }
         }
 
         // ===== EVENT LISTENERS =====
@@ -520,7 +646,6 @@
                 navigator.clipboard.writeText(keyText).then(() => {
                     alert('✅ Đã sao chép!');
                 }).catch(() => {
-                    // Fallback
                     generatedKeyInput.select();
                     document.execCommand('copy');
                     alert('✅ Đã sao chép!');
@@ -534,9 +659,7 @@
 
         // Làm mới
         refreshBtn.addEventListener('click', () => {
-            loadFromStorage();
-            renderKeys();
-            alert('✅ Đã làm mới!');
+            loadKeysFromServer();
         });
 
         // Xóa tất cả
@@ -547,19 +670,22 @@
 
         // ===== KHỞI TẠO =====
 
-        // Tải dữ liệu từ localStorage
+        // Tải dữ liệu từ localStorage trước
         loadFromStorage();
         renderKeys();
 
-        // Tự động kiểm tra kết nối sau 1s
-        setTimeout(checkConnection, 1000);
+        // Tự động kiểm tra kết nối và tải dữ liệu từ server
+        setTimeout(() => {
+            checkConnection();
+        }, 1000);
 
         // Cho phép gọi deleteKey từ HTML
         window.deleteKey = deleteKey;
 
         console.log('🚀 Ứng dụng đã sẵn sàng!');
+        console.log(`📡 API URL: ${API_URL}`);
         console.log('📝 Nhập key thủ công không giới hạn ký tự');
-        console.log('💾 Dữ liệu được lưu tự động vào localStorage');
+        console.log('💾 Dữ liệu được đồng bộ với server và lưu local');
     </script>
 </body>
 </html>
