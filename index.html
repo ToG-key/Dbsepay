@@ -331,11 +331,8 @@
 
     <script>
         // ===== CẤU HÌNH =====
-        // Tự động phát hiện môi trường
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const API_URL = isLocal 
-            ? 'http://localhost:3000/api'  // Local
-            : 'https://dbsepay.vercel.app/api';  // Production
+        // Sử dụng URL của Vercel
+        const API_URL = 'https://dbsepay.vercel.app/api';
 
         // ===== DATA =====
         let keys = [];
@@ -370,16 +367,6 @@
             }, 5000);
         }
 
-        // Tạo key ngẫu nhiên
-        function generateRandomKey(length) {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            let result = '';
-            for (let i = 0; i < length; i++) {
-                result += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            return result;
-        }
-
         // Tạo key có dấu gạch ngang
         function generateStructuredKey(length) {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -400,7 +387,7 @@
             return parts.join('-');
         }
 
-        // Gọi API với xử lý lỗi tốt hơn
+        // Gọi API
         async function callAPI(endpoint, method = 'GET', data = null) {
             try {
                 const options = {
@@ -416,20 +403,20 @@
 
                 const response = await fetch(`${API_URL}${endpoint}`, options);
                 
-                // Kiểm tra content-type
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    const text = await response.text();
+                // Kiểm tra response
+                const text = await response.text();
+                
+                // Thử parse JSON
+                try {
+                    const result = JSON.parse(text);
+                    if (!response.ok) {
+                        throw new Error(result.message || `Lỗi HTTP ${response.status}`);
+                    }
+                    return result;
+                } catch (e) {
+                    // Nếu không phải JSON, throw error với nội dung
                     throw new Error(`Server trả về HTML thay vì JSON. Vui lòng kiểm tra API endpoint: ${API_URL}${endpoint}`);
                 }
-
-                const result = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(result.message || `Lỗi HTTP ${response.status}`);
-                }
-
-                return result;
             } catch (error) {
                 console.error('API Error:', error);
                 throw error;
@@ -553,7 +540,6 @@
             } catch (error) {
                 console.error('Lỗi thêm key lên server:', error);
                 showError('Không thể thêm key lên server: ' + error.message);
-                // Fallback: thêm vào local
             }
 
             // Thêm vào local nếu không kết nối được server
@@ -724,11 +710,11 @@
         // Cho phép gọi deleteKey từ HTML
         window.deleteKey = deleteKey;
 
-        console.log('🚀 Ứng dụng đã sẵn sàng!');
-        console.log(`📡 API URL: ${API_URL}`);
-        console.log(`📁 Môi trường: ${isLocal ? 'Local' : 'Production'}`);
-        console.log('📝 Nhập key thủ công không giới hạn ký tự');
-        console.log('💾 Dữ liệu được đồng bộ với server và lưu local');
+        console.log('❤️ Ứng dụng đã sẵn sàng!');
+        console.log(`👥 API URL: ${API_URL}`);
+        console.log('🟢 Môi trường: Production');
+        console.log('🟢 Nhập key thủ công không giới hạn ký tự');
+        console.log('🟢 Dữ liệu được đồng bộ với server và lưu local');
     </script>
 </body>
 </html>
