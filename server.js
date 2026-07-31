@@ -4,13 +4,27 @@ const cors = require('cors');
 
 const app = express();
 
+// Cấu hình CORS chi tiết
+const corsOptions = {
+    origin: '*', // Cho phép tất cả domain
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['Content-Length', 'X-Requested-With'],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204
+};
+
 // Middleware
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors(corsOptions));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Logging middleware
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`);
+    next();
+});
 
 // Dữ liệu trong memory (sẽ mất khi server restart)
 let keys = [];
@@ -24,7 +38,8 @@ app.get('/api/health', (req, res) => {
         status: 'ok',
         timestamp: new Date().toISOString(),
         message: 'Server đang chạy',
-        totalKeys: keys.length
+        totalKeys: keys.length,
+        environment: process.env.NODE_ENV || 'development'
     });
 });
 
