@@ -207,9 +207,18 @@
             background: #ffc107;
         }
 
-        .loading {
-            opacity: 0.6;
-            pointer-events: none;
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #f5c6cb;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
         }
 
         @media (max-width: 600px) {
@@ -246,6 +255,11 @@
 <body>
     <div class="container">
         <h1>🔑 TẠO KEY</h1>
+
+        <!-- Error message -->
+        <div class="error-message" id="errorMessage">
+            <strong>⚠️ Lỗi:</strong> <span id="errorText"></span>
+        </div>
 
         <!-- Phần nhập key thủ công -->
         <div class="section">
@@ -317,7 +331,11 @@
 
     <script>
         // ===== CẤU HÌNH =====
-        const API_URL = 'https://dbsepay.vercel.app/api';
+        // Tự động phát hiện môi trường
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const API_URL = isLocal 
+            ? 'http://localhost:3000/api'  // Local
+            : 'https://dbsepay.vercel.app/api';  // Production
 
         // ===== DATA =====
         let keys = [];
@@ -338,8 +356,19 @@
         const checkBtn = document.getElementById('checkBtn');
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
 
         // ===== FUNCTIONS =====
+
+        // Hiển thị lỗi
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.classList.add('show');
+            setTimeout(() => {
+                errorMessage.classList.remove('show');
+            }, 5000);
+        }
 
         // Tạo key ngẫu nhiên
         function generateRandomKey(length) {
@@ -371,7 +400,7 @@
             return parts.join('-');
         }
 
-        // Gọi API
+        // Gọi API với xử lý lỗi tốt hơn
         async function callAPI(endpoint, method = 'GET', data = null) {
             try {
                 const options = {
@@ -386,10 +415,18 @@
                 }
 
                 const response = await fetch(`${API_URL}${endpoint}`, options);
+                
+                // Kiểm tra content-type
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    throw new Error(`Server trả về HTML thay vì JSON. Vui lòng kiểm tra API endpoint: ${API_URL}${endpoint}`);
+                }
+
                 const result = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(result.message || 'Có lỗi xảy ra');
+                    throw new Error(result.message || `Lỗi HTTP ${response.status}`);
                 }
 
                 return result;
@@ -445,6 +482,7 @@
                 }
             } catch (error) {
                 console.error('Lỗi tải keys:', error);
+                showError('Không thể kết nối server: ' + error.message);
                 // Dùng dữ liệu local
                 loadFromStorage();
                 renderKeys();
@@ -514,6 +552,7 @@
                 }
             } catch (error) {
                 console.error('Lỗi thêm key lên server:', error);
+                showError('Không thể thêm key lên server: ' + error.message);
                 // Fallback: thêm vào local
             }
 
@@ -548,6 +587,7 @@
                 }
             } catch (error) {
                 console.error('Lỗi xóa key trên server:', error);
+                showError('Không thể xóa key trên server: ' + error.message);
             }
 
             // Xóa local
@@ -572,6 +612,7 @@
                 }
             } catch (error) {
                 console.error('Lỗi xóa tất cả trên server:', error);
+                showError('Không thể xóa tất cả trên server: ' + error.message);
             }
 
             // Xóa local
@@ -599,6 +640,7 @@
                 }
             } catch (error) {
                 console.error('Lỗi kết nối:', error);
+                showError('Không thể kết nối server: ' + error.message);
                 isConnected = false;
                 statusDot.className = 'dot dot-disconnected';
                 statusText.textContent = '❌ Mất kết nối (dùng local)';
@@ -684,6 +726,7 @@
 
         console.log('🚀 Ứng dụng đã sẵn sàng!');
         console.log(`📡 API URL: ${API_URL}`);
+        console.log(`📁 Môi trường: ${isLocal ? 'Local' : 'Production'}`);
         console.log('📝 Nhập key thủ công không giới hạn ký tự');
         console.log('💾 Dữ liệu được đồng bộ với server và lưu local');
     </script>
