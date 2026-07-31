@@ -1,386 +1,565 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>💳 SePay Webhook</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0a0e1a;
-      color: #e2e8f0;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .container { max-width: 1100px; margin: 0 auto; }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 16px 0;
-      border-bottom: 1px solid #1a2236;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .header h1 {
-      font-size: 22px;
-      font-weight: 700;
-      background: linear-gradient(135deg, #f59e0b, #f97316);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .header .status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: #94a3b8;
-    }
-    .header .status .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #22c55e;
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
-    .webhook-box {
-      background: #0f172a;
-      border: 1px solid #1f2937;
-      border-radius: 10px;
-      padding: 12px 16px;
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .webhook-box code {
-      font-family: 'Courier New', monospace;
-      font-size: 13px;
-      color: #f59e0b;
-      word-break: break-all;
-      flex: 1;
-    }
-    .webhook-box .badge {
-      background: #22c55e20;
-      color: #22c55e;
-      padding: 2px 12px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .webhook-box button {
-      padding: 4px 14px;
-      background: #1f2937;
-      border: none;
-      border-radius: 6px;
-      color: #e2e8f0;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .webhook-box button:hover { background: #374151; }
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 14px;
-      margin-bottom: 20px;
-    }
-    .stat-card {
-      background: #111827;
-      border: 1px solid #1f2937;
-      border-radius: 10px;
-      padding: 14px 18px;
-    }
-    .stat-card .label {
-      font-size: 11px;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .stat-card .value {
-      font-size: 20px;
-      font-weight: 700;
-      margin-top: 2px;
-    }
-    .stat-card .value.in { color: #22c55e; }
-    .stat-card .value.out { color: #ef4444; }
-    .stat-card .value.total { color: #f59e0b; }
-    .filters {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 14px;
-      flex-wrap: wrap;
-    }
-    .filters button {
-      padding: 5px 14px;
-      border: 1px solid #1f2937;
-      border-radius: 6px;
-      background: transparent;
-      color: #94a3b8;
-      cursor: pointer;
-      font-size: 13px;
-      transition: all 0.2s;
-    }
-    .filters button:hover { background: #1f2937; }
-    .filters button.active {
-      background: #f59e0b;
-      color: #0a0e1a;
-      border-color: #f59e0b;
-    }
-    .table-wrap {
-      background: #111827;
-      border: 1px solid #1f2937;
-      border-radius: 10px;
-      overflow: auto;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    th {
-      background: #0f172a;
-      padding: 10px 14px;
-      text-align: left;
-      font-weight: 500;
-      color: #6b7280;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-bottom: 1px solid #1f2937;
-      position: sticky;
-      top: 0;
-    }
-    td {
-      padding: 10px 14px;
-      border-bottom: 1px solid #1a2236;
-      color: #e2e8f0;
-    }
-    tr:hover td { background: #1a2236; }
-    .amount-in { color: #22c55e; }
-    .amount-out { color: #ef4444; }
-    .tx-type {
-      padding: 2px 10px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .tx-type.in { background: #22c55e20; color: #22c55e; }
-    .tx-type.out { background: #ef444420; color: #ef4444; }
-    .empty {
-      text-align: center;
-      padding: 40px 20px;
-      color: #6b7280;
-    }
-    .refresh-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-      font-size: 13px;
-      color: #6b7280;
-    }
-    @media (max-width: 640px) {
-      .stats { grid-template-columns: 1fr 1fr; }
-      table { font-size: 12px; }
-      th, td { padding: 6px 8px; }
-    }
-  </style>
-</head>
-<body>
-
-<div class="container">
-  <div class="header">
-    <h1>💳 SePay Webhook</h1>
-    <div class="status">
-      <span class="dot"></span>
-      <span id="statusText">Đang kết nối...</span>
-      <span style="color:#475569;margin-left:8px;" id="lastUpdate"></span>
-    </div>
-  </div>
-
-  <div class="webhook-box">
-    <span style="color:#6b7280;font-size:13px;">🔗 Webhook URL:</span>
-    <code id="webhookUrl">https://your-domain.vercel.app/webhook</code>
-    <span class="badge">JSON</span>
-    <button onclick="copyWebhookUrl()">📋 Sao chép</button>
-  </div>
-
-  <div class="stats">
-    <div class="stat-card">
-      <div class="label">Tổng giao dịch</div>
-      <div class="value total" id="totalTx">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Tiền vào</div>
-      <div class="value in" id="totalIn">0đ</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Tiền ra</div>
-      <div class="value out" id="totalOut">0đ</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Số dư gần nhất</div>
-      <div class="value total" id="latestBalance">0đ</div>
-    </div>
-  </div>
-
-  <div class="filters">
-    <button class="active" data-filter="all">📊 Tất cả</button>
-    <button data-filter="in">⬇️ Tiền vào</button>
-    <button data-filter="out">⬆️ Tiền ra</button>
-  </div>
-
-  <div class="refresh-bar">
-    <span>Tự động làm mới <span id="countdown">5</span>s</span>
-    <button onclick="fetchData()" style="background:transparent;border:1px solid #1f2937;border-radius:6px;padding:2px 12px;color:#94a3b8;cursor:pointer;">⟳ Làm mới</button>
-  </div>
-
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Thời gian</th>
-          <th>Mô tả</th>
-          <th>Số tiền</th>
-          <th>Số dư</th>
-          <th>Loại</th>
-          <th>Mã tham chiếu</th>
-        </tr>
-      </thead>
-      <tbody id="transactionList">
-        <tr><td colspan="6" class="empty">⏳ Đang tải...</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<script>
-  let currentFilter = 'all';
-  let countdown = 5;
-
-  function formatMoney(amount) {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(amount);
-  }
-
-  function formatTime(dateStr) {
-    try { return new Date(dateStr).toLocaleString('vi-VN', { hour12: false }); }
-    catch { return dateStr; }
-  }
-
-  function getWebhookUrl() {
-    return window.location.origin + '/webhook';
-  }
-
-  function copyWebhookUrl() {
-    const url = getWebhookUrl();
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(url).then(() => showToast('✅ Đã sao chép'));
-    } else {
-      const input = document.createElement('input');
-      input.value = url;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand('copy');
-      input.remove();
-      showToast('✅ Đã sao chép');
-    }
-  }
-
-  function showToast(msg) {
-    const el = document.createElement('div');
-    el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a2236;border:1px solid #f59e0b;color:#e2e8f0;padding:10px 24px;border-radius:8px;font-size:14px;z-index:9999;';
-    el.textContent = msg;
-    document.body.appendChild(el);
-    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 2000);
-  }
-
-  async function fetchData() {
-    try {
-      const url = '/api/transactions?limit=100' + (currentFilter !== 'all' ? '&type=' + currentFilter : '');
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (data.success) {
-        document.getElementById('statusText').textContent = '✅ Đã kết nối';
-        document.getElementById('lastUpdate').textContent = 'Cập nhật: ' + new Date().toLocaleTimeString('vi-VN');
-        document.querySelector('.dot').style.background = '#22c55e';
-
-        document.getElementById('totalTx').textContent = data.total || 0;
-        document.getElementById('totalIn').textContent = formatMoney(data.total_in || 0);
-        document.getElementById('totalOut').textContent = formatMoney(data.total_out || 0);
-        document.getElementById('latestBalance').textContent = formatMoney(data.latest_balance || 0);
-
-        const rows = data.data || [];
-        const tbody = document.getElementById('transactionList');
-
-        if (!rows.length) {
-          tbody.innerHTML = '<tr><td colspan="6" class="empty">📭 Chưa có giao dịch nào</td></tr>';
-          return;
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tạo Key</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        tbody.innerHTML = rows.map(t => {
-          const isIn = t.amount > 0;
-          const amount = Math.abs(t.amount || 0);
-          return '<tr>' +
-            '<td style="font-size:12px;color:#94a3b8;">' + formatTime(t.transaction_at || t.received_at) + '</td>' +
-            '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + (t.description || '') + '">' + (t.description || '—') + '</td>' +
-            '<td class="' + (isIn ? 'amount-in' : 'amount-out') + '">' + (isIn ? '+' : '-') + formatMoney(amount) + '</td>' +
-            '<td>' + (t.balance ? formatMoney(t.balance) : '—') + '</td>' +
-            '<td><span class="tx-type ' + (isIn ? 'in' : 'out') + '">' + (isIn ? '⬇️ Vào' : '⬆️ Ra') + '</span></td>' +
-            '<td style="font-size:12px;color:#6b7280;font-family:monospace;">' + (t.reference_code || t.transaction_id?.slice(-8) || '—') + '</td>' +
-            '</tr>';
-        }).join('');
-      }
-    } catch (error) {
-      document.getElementById('statusText').textContent = '🔴 Mất kết nối';
-      document.querySelector('.dot').style.background = '#ef4444';
-    }
-  }
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+        }
 
-  // ==================== POLLING ====================
-  let pollInterval;
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
 
-  function startPolling() {
-    fetchData();
-    pollInterval = setInterval(() => {
-      countdown--;
-      document.getElementById('countdown').textContent = countdown;
-      if (countdown <= 0) {
-        countdown = 5;
-        fetchData();
-      }
-    }, 1000);
-  }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
 
-  // ==================== FILTERS ====================
-  document.querySelectorAll('.filters button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentFilter = btn.dataset.filter;
-      fetchData();
-    });
-  });
+        .section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
 
-  // ==================== WEBHOOK URL ====================
-  document.getElementById('webhookUrl').textContent = getWebhookUrl();
+        .section h2 {
+            color: #555;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
 
-  // ==================== BOOT ====================
-  startPolling();
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
 
-  console.log('🚀 SePay Webhook Dashboard ready');
-  console.log('🔗 Webhook URL:', getWebhookUrl());
-</script>
+        .input-group input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
 
+        .input-group input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .input-group select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button.danger {
+            background: #dc3545;
+        }
+
+        button.danger:hover {
+            background: #c82333;
+        }
+
+        button.success {
+            background: #28a745;
+        }
+
+        button.success:hover {
+            background: #218838;
+        }
+
+        .key-display {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .key-display input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            background: #f0f7ff;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th {
+            background: #007bff;
+            color: white;
+            padding: 10px;
+            text-align: left;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        .status {
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-active {
+            background: #28a745;
+            color: white;
+        }
+
+        .status-inactive {
+            background: #dc3545;
+            color: white;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .count {
+            margin-left: auto;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .empty {
+            text-align: center;
+            color: #999;
+            padding: 30px;
+        }
+
+        .server-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .dot-connected {
+            background: #28a745;
+        }
+
+        .dot-disconnected {
+            background: #dc3545;
+        }
+
+        .dot-checking {
+            background: #ffc107;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+
+            .input-group {
+                flex-direction: column;
+            }
+
+            .key-display {
+                flex-direction: column;
+            }
+
+            .actions {
+                flex-direction: column;
+            }
+
+            .count {
+                margin-left: 0;
+            }
+
+            table {
+                font-size: 14px;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔑 TẠO KEY</h1>
+
+        <!-- Phần nhập key thủ công -->
+        <div class="section">
+            <h2>📝 Nhập key thủ công</h2>
+            <div class="input-group">
+                <input type="text" id="manualKey" placeholder="Nhập key bất kỳ...">
+                <button id="addKeyBtn">➕ Thêm</button>
+            </div>
+        </div>
+
+        <!-- Phần tạo key tự động -->
+        <div class="section">
+            <h2>⚡ Tạo key tự động</h2>
+            <div class="input-group">
+                <select id="keyLength">
+                    <option value="8">8 ký tự</option>
+                    <option value="12" selected>12 ký tự</option>
+                    <option value="16">16 ký tự</option>
+                    <option value="20">20 ký tự</option>
+                    <option value="24">24 ký tự</option>
+                    <option value="32">32 ký tự</option>
+                </select>
+                <button id="generateBtn">🎲 Tạo</button>
+            </div>
+            <div class="key-display">
+                <input type="text" id="generatedKey" readonly placeholder="Key sẽ hiển thị ở đây">
+                <button id="copyBtn" class="success">📋 Sao chép</button>
+            </div>
+        </div>
+
+        <!-- Danh sách key -->
+        <div class="section">
+            <h2>📋 Danh sách key</h2>
+            <div style="max-height: 400px; overflow-y: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Key</th>
+                            <th>Trạng thái</th>
+                            <th>Thời gian</th>
+                            <th>Xóa</th>
+                        </tr>
+                    </thead>
+                    <tbody id="keyList">
+                        <tr>
+                            <td colspan="5" class="empty">Chưa có key nào</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="actions">
+                <button id="refreshBtn">🔄 Làm mới</button>
+                <button id="deleteAllBtn" class="danger">🗑️ Xóa tất cả</button>
+                <span class="count" id="keyCount">Tổng: 0</span>
+            </div>
+        </div>
+
+        <!-- Trạng thái -->
+        <div class="section">
+            <h2>🔌 Trạng thái</h2>
+            <div class="server-status">
+                <span class="dot dot-disconnected" id="statusDot"></span>
+                <span id="statusText">Chưa kết nối</span>
+                <button id="checkBtn" style="margin-left: auto;">Kiểm tra</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== DATA =====
+        let keys = [];
+        let isConnected = false;
+
+        // DOM elements
+        const manualKeyInput = document.getElementById('manualKey');
+        const addKeyBtn = document.getElementById('addKeyBtn');
+        const generateBtn = document.getElementById('generateBtn');
+        const keyLengthSelect = document.getElementById('keyLength');
+        const generatedKeyInput = document.getElementById('generatedKey');
+        const copyBtn = document.getElementById('copyBtn');
+        const keyList = document.getElementById('keyList');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const deleteAllBtn = document.getElementById('deleteAllBtn');
+        const keyCount = document.getElementById('keyCount');
+        const checkBtn = document.getElementById('checkBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+
+        // ===== FUNCTIONS =====
+
+        // Tạo key ngẫu nhiên
+        function generateRandomKey(length) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        // Tạo key có dấu gạch ngang
+        function generateStructuredKey(length) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let parts = [];
+            const partSize = 4;
+            const numParts = Math.ceil(length / partSize);
+            
+            for (let i = 0; i < numParts; i++) {
+                let part = '';
+                const remaining = length - i * partSize;
+                const currentSize = remaining < partSize ? remaining : partSize;
+                for (let j = 0; j < currentSize; j++) {
+                    part += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                parts.push(part);
+            }
+            
+            return parts.join('-');
+        }
+
+        // Lưu vào localStorage
+        function saveToStorage() {
+            try {
+                localStorage.setItem('myKeys', JSON.stringify(keys));
+            } catch (e) {
+                console.log('Lỗi lưu:', e);
+            }
+        }
+
+        // Tải từ localStorage
+        function loadFromStorage() {
+            try {
+                const data = localStorage.getItem('myKeys');
+                if (data) {
+                    keys = JSON.parse(data);
+                    return true;
+                }
+            } catch (e) {
+                console.log('Lỗi tải:', e);
+            }
+            return false;
+        }
+
+        // Hiển thị danh sách key
+        function renderKeys() {
+            if (keys.length === 0) {
+                keyList.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="empty">📭 Chưa có key nào</td>
+                    </tr>
+                `;
+                keyCount.textContent = 'Tổng: 0';
+                return;
+            }
+
+            keyList.innerHTML = keys.map((key, index) => `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td><strong>${key.key}</strong></td>
+                    <td>
+                        <span class="status ${key.status === 'active' ? 'status-active' : 'status-inactive'}">
+                            ${key.status === 'active' ? '✅ Hoạt động' : '❌ Không hoạt động'}
+                        </span>
+                    </td>
+                    <td>${key.createdAt || 'N/A'}</td>
+                    <td>
+                        <button class="danger" onclick="deleteKey('${key.id}')" style="padding: 5px 10px; font-size: 12px;">
+                            🗑️
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            keyCount.textContent = `Tổng: ${keys.length}`;
+        }
+
+        // Thêm key mới
+        function addKey(keyValue) {
+            if (!keyValue || keyValue.trim() === '') {
+                alert('⚠️ Vui lòng nhập key!');
+                return false;
+            }
+
+            const newKey = {
+                id: 'key_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                key: keyValue.trim(),
+                status: 'active',
+                createdAt: new Date().toLocaleString('vi-VN')
+            };
+
+            keys.unshift(newKey);
+            renderKeys();
+            saveToStorage();
+            
+            manualKeyInput.value = '';
+            return true;
+        }
+
+        // Xóa 1 key
+        function deleteKey(id) {
+            if (!confirm('Bạn có chắc muốn xóa key này?')) return;
+            
+            keys = keys.filter(k => k.id !== id);
+            renderKeys();
+            saveToStorage();
+        }
+
+        // Xóa tất cả
+        function deleteAllKeys() {
+            if (!confirm('Bạn có chắc muốn xóa TẤT CẢ key?')) return;
+            
+            keys = [];
+            renderKeys();
+            saveToStorage();
+            alert('✅ Đã xóa tất cả!');
+        }
+
+        // Kiểm tra kết nối server (giả lập)
+        function checkConnection() {
+            statusDot.className = 'dot dot-checking';
+            statusText.textContent = 'Đang kiểm tra...';
+            checkBtn.disabled = true;
+
+            // Giả lập kiểm tra kết nối
+            setTimeout(() => {
+                // 80% kết nối thành công
+                const connected = Math.random() < 0.8;
+                
+                if (connected) {
+                    isConnected = true;
+                    statusDot.className = 'dot dot-connected';
+                    statusText.textContent = '✅ Đã kết nối server';
+                } else {
+                    isConnected = false;
+                    statusDot.className = 'dot dot-disconnected';
+                    statusText.textContent = '❌ Mất kết nối (dùng local)';
+                }
+                
+                checkBtn.disabled = false;
+            }, 1000);
+        }
+
+        // ===== EVENT LISTENERS =====
+
+        // Thêm key thủ công
+        addKeyBtn.addEventListener('click', () => {
+            addKey(manualKeyInput.value);
+        });
+
+        // Enter để thêm key
+        manualKeyInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addKeyBtn.click();
+            }
+        });
+
+        // Tạo key tự động
+        generateBtn.addEventListener('click', () => {
+            const length = parseInt(keyLengthSelect.value);
+            const newKey = generateStructuredKey(length);
+            generatedKeyInput.value = newKey;
+            
+            // Tự động thêm vào danh sách
+            addKey(newKey);
+        });
+
+        // Sao chép key
+        copyBtn.addEventListener('click', () => {
+            const keyText = generatedKeyInput.value;
+            if (!keyText) {
+                alert('⚠️ Chưa có key để sao chép!');
+                return;
+            }
+
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(keyText).then(() => {
+                    alert('✅ Đã sao chép!');
+                }).catch(() => {
+                    // Fallback
+                    generatedKeyInput.select();
+                    document.execCommand('copy');
+                    alert('✅ Đã sao chép!');
+                });
+            } else {
+                generatedKeyInput.select();
+                document.execCommand('copy');
+                alert('✅ Đã sao chép!');
+            }
+        });
+
+        // Làm mới
+        refreshBtn.addEventListener('click', () => {
+            loadFromStorage();
+            renderKeys();
+            alert('✅ Đã làm mới!');
+        });
+
+        // Xóa tất cả
+        deleteAllBtn.addEventListener('click', deleteAllKeys);
+
+        // Kiểm tra kết nối
+        checkBtn.addEventListener('click', checkConnection);
+
+        // ===== KHỞI TẠO =====
+
+        // Tải dữ liệu từ localStorage
+        loadFromStorage();
+        renderKeys();
+
+        // Tự động kiểm tra kết nối sau 1s
+        setTimeout(checkConnection, 1000);
+
+        // Cho phép gọi deleteKey từ HTML
+        window.deleteKey = deleteKey;
+
+        console.log('🚀 Ứng dụng đã sẵn sàng!');
+        console.log('📝 Nhập key thủ công không giới hạn ký tự');
+        console.log('💾 Dữ liệu được lưu tự động vào localStorage');
+    </script>
 </body>
 </html>
