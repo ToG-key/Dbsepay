@@ -24,7 +24,6 @@ app.post('/api/keys/create', (req, res) => {
     const days = parseInt(req.body.days) || 30;
     const newKey = crypto.randomBytes(8).toString('hex').toUpperCase();
     
-    // Tính thời gian hết hạn (mili-giây)
     const expireTime = Date.now() + (days * 24 * 60 * 60 * 1000);
 
     const db = loadDB();
@@ -53,7 +52,6 @@ app.post('/api/keys/check-status', (req, res) => {
 
     const keyData = db[key];
 
-    // Kiểm tra hết hạn
     if (Date.now() > keyData.expireTime) {
         keyData.isExpired = true;
         db[key] = keyData;
@@ -81,6 +79,34 @@ app.post('/api/keys/manual-delete', (req, res) => {
         return res.json({ success: true });
     }
     res.status(404).json({ success: false, error: "Key không tồn tại" });
+});
+
+// ==========================================
+// API 4: XEM TOÀN BỘ DANH SÁCH KEY (MỚI)
+// ==========================================
+app.get('/api/keys/list', (req, res) => {
+    try {
+        const db = loadDB();
+        
+        // Tùy chọn: Định dạng lại thời gian cho dễ đọc
+        const list = Object.keys(db).map(key => {
+            return {
+                key: key,
+                status: db[key].status,
+                isExpired: db[key].isExpired || Date.now() > db[key].expireTime,
+                expireTime: new Date(db[key].expireTime).toLocaleString('vi-VN'),
+                createdAt: new Date(db[key].createdAt).toLocaleString('vi-VN')
+            };
+        });
+
+        res.json({
+            success: true,
+            total: list.length,
+            keys: list
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 // Khởi chạy server
