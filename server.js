@@ -8,22 +8,35 @@ app.use(express.json());
 
 const DB_FILE = path.join(__dirname, 'keys_database.json');
 
-// Khởi tạo file database nếu chưa có
 if (!fs.existsSync(DB_FILE)) {
     fs.writeFileSync(DB_FILE, JSON.stringify({}), 'utf-8');
 }
 
-// Hàm đọc/ghi database
 const loadDB = () => JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
 const saveDB = (data) => fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 4), 'utf-8');
 
 // ==========================================
-// API 1: TẠO KEY MỚI (Dành cho Admin)
+// TRANG CHỦ (Sửa lỗi Cannot GET /)
+// ==========================================
+app.get('/', (req, res) => {
+    res.json({
+        status: "ok",
+        message: "Hệ thống API Key đang hoạt động",
+        endpoints: [
+            "POST /api/keys/create",
+            "GET|POST /api/keys/check-status",
+            "POST /api/keys/manual-delete",
+            "GET /api/keys/list"
+        ]
+    });
+});
+
+// ==========================================
+// API 1: TẠO KEY MỚI (POST)
 // ==========================================
 app.post('/api/keys/create', (req, res) => {
     const days = parseInt(req.body.days) || 30;
     const newKey = crypto.randomBytes(8).toString('hex').toUpperCase();
-    
     const expireTime = Date.now() + (days * 24 * 60 * 60 * 1000);
 
     const db = loadDB();
@@ -39,10 +52,12 @@ app.post('/api/keys/create', (req, res) => {
 });
 
 // ==========================================
-// API 2: KIỂM TRA KEY (Dành cho Web/Tool)
+// API 2: KIỂM TRA KEY (HỖ TRỢ CẢ GET VÀ POST)
 // ==========================================
-app.post('/api/keys/check-status', (req, res) => {
-    const key = req.body.key;
+app.all('/api/keys/check-status', (req, res) => {
+    // Lấy key từ body (nếu là POST) hoặc từ query ?key=... (nếu là GET)
+    const key = (req.body && req.body.key) || req.query.key;
+    
     if (!key) return res.status(400).json({ success: false, error: "Thiếu key" });
 
     const db = loadDB();
@@ -66,7 +81,7 @@ app.post('/api/keys/check-status', (req, res) => {
 });
 
 // ==========================================
-// API 3: XÓA KEY (Sau khi xác thực thành công)
+// API 3: XÓA KEY (POST)
 // ==========================================
 app.post('/api/keys/manual-delete', (req, res) => {
     const key = req.body.key;
@@ -82,13 +97,11 @@ app.post('/api/keys/manual-delete', (req, res) => {
 });
 
 // ==========================================
-// API 4: XEM TOÀN BỘ DANH SÁCH KEY (MỚI)
+// API 4: XEM TOÀN BỘ KEY (GET)
 // ==========================================
 app.get('/api/keys/list', (req, res) => {
     try {
         const db = loadDB();
-        
-        // Tùy chọn: Định dạng lại thời gian cho dễ đọc
         const list = Object.keys(db).map(key => {
             return {
                 key: key,
@@ -99,17 +112,12 @@ app.get('/api/keys/list', (req, res) => {
             };
         });
 
-        res.json({
-            success: true,
-            total: list.length,
-            keys: list
-        });
+        res.json({ success: true, total: list.length, keys: list });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Khởi chạy server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`[SERVER] Backend JS đang chạy tại http://localhost:${PORT}`);
